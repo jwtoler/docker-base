@@ -1,0 +1,10 @@
+providers:
+    docker:
+        exposedByDefault: false
+        network: shared
+
+entryPoints:
+    web:
+        address: ":80"
+
+api: {}

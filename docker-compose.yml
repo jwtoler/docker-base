@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+    thp_fixer:
+        container_name: thp_fixer
+        image: debian
+        entrypoint: ./disable_thp_support.sh
+        privileged: true
+        pid: host
+        volumes:
+            - ./docker/util/disable_thp_support.sh:/disable_thp_support.sh
+    dnsmasq:
+        container_name: dns
+        image: tschaffter/dnsmasq
+        cap_add:
+            - NET_ADMIN
+        ports:
+            - 5053:53/udp
+            - 5053:53/tcp
+        volumes:
+            - ./docker/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
+    db:
+        cap_add:
+            - SYS_NICE
+        security_opt:
+            - seccomp:unconfined #this gets rid of a mbind error that is in docker
+        command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --information-schema-stats-expiry=0  --max-allowed-packet=128M --skip-name-resolve
+        image: mysql:${MYSQL_VERSION:-8.0.29}
+        container_name: mysql
+        environment:
+            MYSQL_PASSWORD: ""
+            MYSQL_ROOT_PASSWORD: ""
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        env_file:
+          - ./docker/environment
+        ports:
+            - 3306:3306
+        volumes:
+            - database:/var/lib/mysql:delegated
+            - ./docker/mysql:/etc/mysql/conf.d:ro
+    redis:
+        container_name: redis
+        image: redis:${REDIS_VERSION:-5.0.14}
+        env_file:
+          - ./docker/environment
+        ports:
+            - 6379:6379
+        depends_on:
+            thp_fixer:
+                condition: service_completed_successfully
+    maildev:
+        container_name: maildev
+        image: maildev/maildev:latest
+        ports:
+            - 1025:1025
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.maildev.rule=Host(`mail.dev.test`)"
+            - "traefik.http.services.maildev.loadbalancer.server.port=1080"
+    traefik:
+        container_name: proxy
+        image: traefik:2.8
+        ports:
+            - 80:80
+            - 8080:8080
+        env_file:
+          - ./docker/environment
+        volumes:
+            - "./docker/traefik:/etc/traefik:ro"
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.traefik-api.rule=Host(`proxy.dev.test`)"
+            - "traefik.http.routers.traefik-api.service=api@internal"
+
+networks:
+    default:
+        name: shared
+        external: true
+
+volumes:
+    database:

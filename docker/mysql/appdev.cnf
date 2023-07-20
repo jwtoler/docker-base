@@ -1,0 +1,11 @@
+[mysqld]
+skip-name-resolve = 1
+disable-log-bin = 1
+mysqlx = 0
+innodb_redo_log_capacity = 256M
+innodb_flush_method = O_DIRECT
+innodb_buffer_pool_size = 4096M
+max_connections = 500
+innodb_read_io_threads = 8
+innodb_write_io_threads = 8
+default_time_zone=America/New_York
